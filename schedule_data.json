@@ -1,0 +1,259 @@
+{
+  "scheduleData": [
+    {
+      "subjectName": "物理",
+      "schoolLevel": "senior",
+      "subjectColor": "physics",
+      "newCount": 5,
+      "showNewBadge": true,
+      "cards": [
+        {
+          "cardTitle": "二轮复习",
+          "level": "A",
+          "instructor": "王凯",
+          "modules": [
+            {
+              "moduleName": "二轮复习",
+              "topics": [
+                {
+                  "topicName": "力和运动",
+                  "courseName": "力和运动",
+                  "lessons": [
+                    "力与曲线运动-圆周运动"
+                  ]
+                },
+                {
+                  "topicName": "能量与动量",
+                  "courseName": "",
+                  "lessons": [
+                    "功能关系",
+                    "动量定理提升",
+                    "动量守恒定律应用",
+                    "力学三大观点的综合应用"
+                  ]
+                }
+              ]
+            },
+            {
+              "moduleName": "新模块",
+              "topics": []
+            }
+          ],
+          "mergeTopicsAndLessons": true
+        },
+        {
+          "cardTitle": "新课程卡片",
+          "level": "A",
+          "instructor": "讲师名",
+          "modules": []
+        }
+      ],
+      "_lastTotalLessons": 5
+    },
+    {
+      "subjectName": "化学",
+      "schoolLevel": "senior",
+      "subjectColor": "chemistry",
+      "newCount": 0,
+      "showNewBadge": true,
+      "cards": [],
+      "_lastTotalLessons": 0
+    },
+    {
+      "subjectName": "新学科",
+      "schoolLevel": "junior",
+      "subjectColor": "blue",
+      "newCount": 2,
+      "showNewBadge": true,
+      "cards": [
+        {
+          "cardTitle": "新课程卡片",
+          "level": "A",
+          "instructor": "讲师名",
+          "modules": [
+            {
+              "moduleName": "新模块",
+              "topics": [
+                {
+                  "topicName": "新专题",
+                  "courseName": "",
+                  "lessons": [
+                    "新课程"
+                  ]
+                },
+                {
+                  "topicName": "新专题",
+                  "courseName": "",
+                  "lessons": [
+                    "新课程"
+                  ]
+                }
+              ]
+            },
+            {
+              "moduleName": "新模块",
+              "topics": []
+            }
+          ],
+          "mergeTopicsAndLessons": false
+        },
+        {
+          "cardTitle": "新课程卡片",
+          "level": "A",
+          "instructor": "讲师名",
+          "modules": []
+        }
+      ],
+      "_lastTotalLessons": 2
+    },
+    {
+      "subjectName": "英语",
+      "schoolLevel": "senior",
+      "subjectColor": "english",
+      "newCount": 2,
+      "showNewBadge": true,
+      "cards": [
+        {
+          "cardTitle": "新课程卡片",
+          "level": "A",
+          "instructor": "讲师名",
+          "modules": []
+        }
+      ],
+      "_lastTotalLessons": 0
+    }
+  ],
+  "savedPages": [
+    {
+      "id": 1,
+      "name": "2026-4-2",
+      "data": [
+        {
+          "subjectName": "物理",
+          "schoolLevel": "senior",
+          "subjectColor": "physics",
+          "newCount": 5,
+          "showNewBadge": true,
+          "cards": [
+            {
+              "cardTitle": "二轮复习",
+              "level": "A",
+              "instructor": "王凯",
+              "modules": [
+                {
+                  "moduleName": "二轮复习",
+                  "topics": [
+                    {
+                      "topicName": "力和运动",
+                      "courseName": "力和运动",
+                      "lessons": [
+                        "力与曲线运动-圆周运动"
+                      ]
+                    },
+                    {
+                      "topicName": "能量与动量",
+                      "courseName": "",
+                      "lessons": [
+                        "功能关系",
+                        "动量定理提升",
+                        "动量守恒定律应用",
+                        "力学三大观点的综合应用"
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "moduleName": "新模块",
+                  "topics": []
+                }
+              ],
+              "mergeTopicsAndLessons": true
+            },
+            {
+              "cardTitle": "新课程卡片",
+              "level": "A",
+              "instructor": "讲师名",
+              "modules": []
+            }
+          ],
+          "_lastTotalLessons": 5
+        },
+        {
+          "subjectName": "化学",
+          "schoolLevel": "senior",
+          "subjectColor": "chemistry",
+          "newCount": 0,
+          "showNewBadge": true,
+          "cards": [],
+          "_lastTotalLessons": 0
+        },
+        {
+          "subjectName": "新学科",
+          "schoolLevel": "junior",
+          "subjectColor": "blue",
+          "newCount": 2,
+          "showNewBadge": true,
+          "cards": [
+            {
+              "cardTitle": "新课程卡片",
+              "level": "A",
+              "instructor": "讲师名",
+              "modules": [
+                {
+                  "moduleName": "新模块",
+                  "topics": [
+                    {
+                      "topicName": "新专题",
+                      "courseName": "",
+                      "lessons": [
+                        "新课程"
+                      ]
+                    },
+                    {
+                      "topicName": "新专题",
+                      "courseName": "",
+                      "lessons": [
+                        "新课程"
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "moduleName": "新模块",
+                  "topics": []
+                }
+              ],
+              "mergeTopicsAndLessons": false
+            },
+            {
+              "cardTitle": "新课程卡片",
+              "level": "A",
+              "instructor": "讲师名",
+              "modules": []
+            }
+          ],
+          "_lastTotalLessons": 2
+        },
+        {
+          "subjectName": "英语",
+          "schoolLevel": "senior",
+          "subjectColor": "english",
+          "newCount": 2,
+          "showNewBadge": true,
+          "cards": [
+            {
+              "cardTitle": "新课程卡片",
+              "level": "A",
+              "instructor": "讲师名",
+              "modules": []
+            }
+          ],
+          "_lastTotalLessons": 0
+        }
+      ]
+    }
+  ],
+  "globalConfig": {
+    "logoImage": null
+  }
+}
