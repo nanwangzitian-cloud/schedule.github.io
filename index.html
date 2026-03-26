@@ -1,3 +1,4 @@
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -1382,10 +1383,10 @@
   </ul>
 
   <script>
-    // 1. 初始化你的 supabaseClient（把这里换成你第三步获取的 URL 和 Key！）
+    // 1. 初始化你的 supabase（把这里换成你第三步获取的 URL 和 Key！）
     const supabaseUrl = 'https://usttdrudotvrnmwynfnm.supabase.co';
     const supabaseKey = 'sb_publishable_T7gpzKyt2I0sUqsw2GhwlQ_l5n4xJB2';
-    const supabaseClient = supabaseClient.createClient(supabaseClientUrl, supabaseClientKey);
+    const supabase = supabaseClient.createClient(supabaseUrl, supabaseKey);
 
     // 2. 将数据发送到数据库
     async function saveData() {
@@ -1396,7 +1397,7 @@
       }
 
       // 告诉 supabaseClient，向 messages 表的 content 列，插入一段数据
-      const { data, error } = await supabaseClient
+      const { data, error } = await supabase
         .from('messages')
         .insert([ { content: text } ]);
 
@@ -1412,7 +1413,7 @@
     // 3. 从数据库读取所有数据
     async function loadData() {
       // 从 messages 表，选取所有列 (*) 的数据，并按创建时间倒序排列
-      const { data, error } = await supabaseClient
+      const { data, error } = await supabase
         .from('messages')
         .select('*')
         .order('created_at', { ascending: false });
