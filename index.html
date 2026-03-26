@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Earth Terminator Line Simulation</title>
+    <link rel="stylesheet" href="./src/style.css">
+</head>
+<body>
+    <div id="canvas-container"></div>
+    
+    <!-- UI Overlay -->
+    <div id="ui-overlay">
+        <div class="panel stats-panel">
+            <h3>Earth Status</h3>
+            <div class="stat-row">
+                <span>Solar Position (Subsolar):</span>
+                <span id="sun-pos">Calculating...</span>
+            </div>
+            <div class="stat-row">
+                <span>Day/Night Ratio:</span>
+                <span id="day-night-ratio">50% / 50%</span>
+            </div>
+            <div class="stat-row">
+                <span>Rotation Speed:</span>
+                <span id="rot-speed">1.0x</span>
+            </div>
+        </div>
+        
+        <div class="controls-panel">
+            <button id="toggle-fullscreen">Toggle Fullscreen</button>
+            <button id="toggle-daynight">Toggle Day/Night View</button>
+        </div>
+    </div>
+
+    <script type="module" src="./src/main.js"></script>
+</body>
+</html>
