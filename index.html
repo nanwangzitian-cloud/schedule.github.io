@@ -1385,7 +1385,7 @@
     // 1. 初始化你的 supabase（把这里换成你第三步获取的 URL 和 Key！）
     const supabaseUrl = 'https://usttdrudotvrnmwynfnm.supabase.co';
     const supabaseKey = 'sb_publishable_T7gpzKyt2I0sUqsw2GhwlQ_l5n4xJB2';
-    const supabase = supabaseClient.createClient(supabaseUrl, supabaseKey);
+    const supabaseClient = supabase.createClient(supabaseUrl, supabaseKey);
 
     // 2. 将数据发送到数据库
     async function saveData() {
