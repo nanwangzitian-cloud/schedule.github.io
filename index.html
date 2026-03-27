@@ -1412,7 +1412,7 @@
     // 3. 从数据库读取所有数据
     async function loadData() {
       // 从 messages 表，选取所有列 (*) 的数据，并按创建时间倒序排列
-      const { data, error } = await supabase
+      const { data, error } = await supabaseClient
         .from('messages')
         .select('*')
         .order('created_at', { ascending: false });
