@@ -572,10 +572,13 @@
 
         createApp({
             setup() {
-                // Initialize from localStorage if available, otherwise use default
+                // --- Supabase Init ---
+                const supabaseUrl = 'https://usttdrudotvrnmwynfnm.supabase.co';
+                const supabaseKey = 'sb_publishable_T7gpzKyt2I0sUqsw2GhwlQ_l5n4xJB2';
+                const supabaseClient = supabase.createClient(supabaseUrl, supabaseKey);
+
+                // Initialize from localStorage to avoid white screen before cloud loads
                 const savedPagesData = localStorage.getItem('schedulePages');
-                
-                // State
                 const savedPages = ref(savedPagesData ? JSON.parse(savedPagesData) : [
                     { id: Date.now(), name: new Date().toLocaleDateString().replace(/\//g, '-'), data: JSON.parse(JSON.stringify(defaultSampleData)) }
                 ]);
@@ -592,6 +595,45 @@
                 const globalConfig = ref(savedConfig ? JSON.parse(savedConfig) : { logoImage: null });
 
                 const currentLevel = ref('junior'); // 'junior' or 'senior'
+
+                // --- Real-time Sync Logic (Supabase) ---
+                let isRemoteUpdate = false;
+                let cloudSyncTimeout = null;
+
+                const saveToCloud = async () => {
+                    if (isRemoteUpdate) return;
+                    
+                    // Sync current page data before saving
+                    const currentPageIndex = savedPages.value.findIndex(p => p.id === currentPageId.value);
+                    if (currentPageIndex !== -1) {
+                        savedPages.value[currentPageIndex].data = JSON.parse(JSON.stringify(scheduleData.value));
+                    }
+
+                    // Always keep a local backup
+                    localStorage.setItem('schedulePages', JSON.stringify(savedPages.value));
+                    localStorage.setItem('globalConfig', JSON.stringify(globalConfig.value));
+
+                    try {
+                        const { error } = await supabaseClient
+                            .from('schedule_data')
+                            .upsert({ 
+                                id: 1, 
+                                pages: savedPages.value, 
+                                config: globalConfig.value,
+                                updated_at: new Date().toISOString()
+                            });
+                        if (error) console.error('同步云端失败:', error);
+                    } catch (e) {
+                        console.error('云端请求报错:', e);
+                    }
+                };
+
+                const debouncedSaveToCloud = () => {
+                    clearTimeout(cloudSyncTimeout);
+                    cloudSyncTimeout = setTimeout(() => {
+                        saveToCloud();
+                    }, 1000);
+                };
                 
                 // Page Management Logic
                 const switchPage = (id) => {
@@ -619,9 +661,8 @@
                         lastStateStr = JSON.stringify(targetPage.data); // Update last state to prevent false history push
                     }
                     
-                    // Delay saving to let Vue finish the state update and avoid watcher conflicts
                     nextTick(() => {
-                        savePagesToStorage();
+                        debouncedSaveToCloud();
                     });
                 };
 
@@ -633,14 +674,9 @@
                     };
                     savedPages.value.push(newPage);
                     
-                    // Allow Vue to process the push before switching
                     nextTick(() => {
                         switchPage(newPage.id);
-                        savePagesToStorage();
-                        // Also trigger sync
-                        setTimeout(() => {
-                            emitSyncData();
-                        }, 100);
+                        debouncedSaveToCloud();
                     });
                 };
 
@@ -655,12 +691,8 @@
                         if (currentPageId.value === deletedId) {
                             switchPage(savedPages.value[0].id);
                         } else {
-                            savePagesToStorage();
+                            debouncedSaveToCloud();
                         }
-                        
-                        setTimeout(() => {
-                            emitSyncData();
-                        }, 100);
                     }
                 };
 
@@ -673,21 +705,7 @@
                     if (!page.name.trim()) {
                         page.name = "未命名";
                     }
-                    savePagesToStorage();
-                    setTimeout(() => {
-                        emitSyncData();
-                    }, 100);
-                };
-
-                const savePagesToStorage = () => {
-                    // Update current page data first if not receiving a remote update
-                    if (!isRemoteUpdate) {
-                        const currentPageIndex = savedPages.value.findIndex(p => p.id === currentPageId.value);
-                        if (currentPageIndex !== -1) {
-                            savedPages.value[currentPageIndex].data = JSON.parse(JSON.stringify(scheduleData.value));
-                        }
-                    }
-                    localStorage.setItem('schedulePages', JSON.stringify(savedPages.value));
+                    debouncedSaveToCloud();
                 };
 
                 // Filter data based on current level
@@ -714,12 +732,7 @@
                     renderSchedule(newValue, 'schedule-content-area', globalConfig.value);
                 }, { deep: true });
 
-                // --- Real-time Sync Logic (Socket.io) ---
-                let socket = null;
-                // Flag to prevent infinite loop
-                let isRemoteUpdate = false;
-                let remoteUpdateTimeout = null;
-
+                // --- Real-time Sync Logic (Supabase) ---
                 onMounted(() => {
                     renderSchedule(filteredData.value, 'schedule-content-area', globalConfig.value);
 
@@ -727,77 +740,72 @@
                     window.addEventListener('keydown', (e) => {
                         if (e.ctrlKey && e.key === 'z') {
                             const activeTag = document.activeElement ? document.activeElement.tagName.toLowerCase() : '';
-                            // Let native browser undo handle text input
-                            if (activeTag === 'input' || activeTag === 'textarea' || activeTag === 'select') {
-                                return;
-                            }
+                            if (activeTag === 'input' || activeTag === 'textarea' || activeTag === 'select') return;
                             e.preventDefault();
                             undo();
                         }
                     });
 
-                    // Initialize Socket.io connection if available
-                    if (typeof io !== 'undefined') {
-                        console.log('Socket.io detected, initializing connection...');
-                        socket = io();
-
-                        socket.on('connect', () => {
-                            console.log('Connected to sync server');
-                        });
-
-                        // Receive initial data or updates
-                        const handleRemoteData = (data) => {
-                            if (data && (data.scheduleData || data.savedPages)) {
-                                console.log('Received remote update');
-                                isRemoteUpdate = true; // Set flag
-                                clearTimeout(remoteUpdateTimeout);
-                                
-                                if (data.savedPages && data.savedPages.length > 0) {
-                                    // Deep copy remote pages
-                                    const newPages = JSON.parse(JSON.stringify(data.savedPages));
-                                    
-                                    // If we receive an update, we should try to stay on the same page ID
-                                    let activePage = newPages.find(p => p.id === currentPageId.value);
-                                    
-                                    if (!activePage) {
-                                        // If our current page was deleted by someone else, fallback to the first available page
-                                        activePage = newPages[0];
-                                        currentPageId.value = activePage.id;
-                                    }
-                                    
-                                    // Update state
-                                    savedPages.value = newPages;
+                    // 1. Initial Load from Cloud
+                    const loadData = async () => {
+                        try {
+                            const { data, error } = await supabaseClient
+                                .from('schedule_data')
+                                .select('*')
+                                .eq('id', 1)
+                                .single();
+                            
+                            if (data) {
+                                isRemoteUpdate = true;
+                                if (data.pages && data.pages.length > 0) {
+                                    savedPages.value = data.pages;
+                                    let activePage = savedPages.value.find(p => p.id === currentPageId.value) || savedPages.value[0];
+                                    currentPageId.value = activePage.id;
                                     scheduleData.value = JSON.parse(JSON.stringify(activePage.data));
                                     lastStateStr = JSON.stringify(activePage.data);
-                                    
-                                    // Save to local cache
-                                    localStorage.setItem('schedulePages', JSON.stringify(newPages));
-                                } else if (data.scheduleData) {
-                                    // Fallback for older format
-                                    scheduleData.value = JSON.parse(JSON.stringify(data.scheduleData));
-                                    lastStateStr = JSON.stringify(data.scheduleData);
+                                    localStorage.setItem('schedulePages', JSON.stringify(savedPages.value));
                                 }
-
-                                if (data.globalConfig) {
-                                    globalConfig.value = JSON.parse(JSON.stringify(data.globalConfig));
-                                    localStorage.setItem('globalConfig', JSON.stringify(data.globalConfig));
+                                if (data.config) {
+                                    globalConfig.value = data.config;
+                                    localStorage.setItem('globalConfig', JSON.stringify(globalConfig.value));
                                 }
-                                
-                                // Render immediately after applying remote data
                                 nextTick(() => {
                                     renderSchedule(filteredData.value, 'schedule-content-area', globalConfig.value);
-                                    
-                                    // Give Vue time to finish all deep watcher triggers before turning off the flag
-                                    remoteUpdateTimeout = setTimeout(() => {
-                                        isRemoteUpdate = false;
-                                    }, 500);
+                                    setTimeout(() => { isRemoteUpdate = false; }, 500);
                                 });
                             }
-                        };
+                        } catch (e) {
+                            console.error('加载云端数据出错:', e);
+                        }
+                    };
+                    loadData();
 
-                        socket.on('init_data', handleRemoteData);
-                        socket.on('sync_data', handleRemoteData);
-                    }
+                    // 2. Realtime Subscription
+                    supabaseClient
+                        .channel('public:schedule_data')
+                        .on('postgres_changes', { event: '*', schema: 'public', table: 'schedule_data' }, payload => {
+                            if (payload.new) {
+                                isRemoteUpdate = true;
+                                const newData = payload.new;
+                                if (newData.pages && newData.pages.length > 0) {
+                                    savedPages.value = newData.pages;
+                                    let activePage = savedPages.value.find(p => p.id === currentPageId.value) || savedPages.value[0];
+                                    currentPageId.value = activePage.id;
+                                    scheduleData.value = JSON.parse(JSON.stringify(activePage.data));
+                                    lastStateStr = JSON.stringify(activePage.data);
+                                    localStorage.setItem('schedulePages', JSON.stringify(savedPages.value));
+                                }
+                                if (newData.config) {
+                                    globalConfig.value = newData.config;
+                                    localStorage.setItem('globalConfig', JSON.stringify(globalConfig.value));
+                                }
+                                nextTick(() => {
+                                    renderSchedule(filteredData.value, 'schedule-content-area', globalConfig.value);
+                                    setTimeout(() => { isRemoteUpdate = false; }, 500);
+                                });
+                            }
+                        })
+                        .subscribe();
                 });
 
                 // --- History / Undo Logic ---
@@ -829,36 +837,9 @@
 
                         nextTick(() => {
                             renderSchedule(filteredData.value, 'schedule-content-area', globalConfig.value);
-                            emitSyncData();
+                            debouncedSaveToCloud();
                             setTimeout(() => { isUndoing = false; }, 200);
                         });
-                    }
-                };
-
-                // Helper to emit sync data
-                const emitSyncData = () => {
-                    if (socket && !isRemoteUpdate) {
-                        console.log('Emitting local changes to server');
-                        
-                        // Ensure current page data is in savedPages before sending
-                        const currentPageIndex = savedPages.value.findIndex(p => p.id === currentPageId.value);
-                        if (currentPageIndex !== -1) {
-                            // Don't directly modify the reactive array in emit, clone it
-                            const pagesClone = JSON.parse(JSON.stringify(savedPages.value));
-                            pagesClone[currentPageIndex].data = JSON.parse(JSON.stringify(scheduleData.value));
-                            
-                            socket.emit('update_data', {
-                                scheduleData: scheduleData.value,
-                                savedPages: pagesClone,
-                                globalConfig: globalConfig.value
-                            });
-                        } else {
-                            socket.emit('update_data', {
-                                scheduleData: scheduleData.value,
-                                savedPages: savedPages.value,
-                                globalConfig: globalConfig.value
-                            });
-                        }
                     }
                 };
 
@@ -877,24 +858,11 @@
                         }
                     }, 500);
                     
-                    // Save to LocalStorage (always keep local backup)
-                    // We need to avoid circular calls to emitSyncData since savePagesToStorage also calls it
-                    const currentPageIndex = savedPages.value.findIndex(p => p.id === currentPageId.value);
-                    if (currentPageIndex !== -1) {
-                        savedPages.value[currentPageIndex].data = JSON.parse(JSON.stringify(newSchedule));
-                    }
-                    localStorage.setItem('schedulePages', JSON.stringify(savedPages.value));
-                    localStorage.setItem('globalConfig', JSON.stringify(newConfig));
-                    
                     // Render
                     renderSchedule(filteredData.value, 'schedule-content-area', newConfig);
 
-                    // Emit to Server if it's a local change
-                    // Add a small debounce to prevent emit storms when typing
-                    clearTimeout(window.syncTimeout);
-                    window.syncTimeout = setTimeout(() => {
-                        emitSyncData();
-                    }, 500);
+                    // Sync
+                    debouncedSaveToCloud();
                 }, { deep: true });
 
                 // We also need to watch currentLevel so that when user switches tabs, the view updates immediately
@@ -907,13 +875,7 @@
                 // Watch savedPages to emit changes when tabs are added/renamed/deleted
                 watch(savedPages, (newPages, oldPages) => {
                     if (isRemoteUpdate) return;
-                    localStorage.setItem('schedulePages', JSON.stringify(newPages));
-                    
-                    // Add debounce here to prevent loops with switchPage
-                    clearTimeout(window.pagesSyncTimeout);
-                    window.pagesSyncTimeout = setTimeout(() => {
-                        emitSyncData();
-                    }, 500);
+                    debouncedSaveToCloud();
                 }, { deep: true });
 
                 // --- Actions ---
@@ -922,7 +884,7 @@
                     if(confirm('确定要重置为默认示例数据吗？当前修改将丢失。')) {
                         scheduleData.value = JSON.parse(JSON.stringify(defaultSampleData));
                         globalConfig.value = { logoImage: null };
-                        savePagesToStorage();
+                        debouncedSaveToCloud();
                         localStorage.removeItem('globalConfig');
                     }
                 };
@@ -1155,8 +1117,7 @@
                     
                     // Force a re-render and sync
                     nextTick(() => {
-                        savePagesToStorage();
-                        emitSyncData();
+                        debouncedSaveToCloud();
                     });
                 };
                 
@@ -1182,8 +1143,7 @@
                     if(confirm('确定删除该学科及其所有数据吗？')) {
                         scheduleData.value.splice(index, 1);
                         nextTick(() => {
-                            savePagesToStorage();
-                            emitSyncData();
+                            debouncedSaveToCloud();
                         });
                     }
                 };
@@ -1320,7 +1280,7 @@
 
                 // --- History Functions ---
                 const saveToHistory = () => {
-                    savePagesToStorage();
+                    debouncedSaveToCloud();
                     alert("当前页数据已成功保存！");
                 };
 
@@ -1352,85 +1312,5 @@
             }
         }).mount('#app');
     </script>
-</body>
-</html>
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>我的云端同步留言板</title>
-  
-  <script src="https://cdn.jsdelivr.net/npm/@supabaseClient/supabaseClient-js@2"></script>
-  
-  <style>
-    body { font-family: sans-serif; padding: 20px; }
-    input { padding: 8px; width: 200px; }
-    button { padding: 8px 16px; cursor: pointer; }
-    li { margin: 10px 0; color: #333; }
-  </style>
-</head>
-<body>
-
-  <h1>大家都在说什么？</h1>
-  
-  <input type="text" id="myInput" placeholder="输入你的留言...">
-  <button onclick="saveData()">发送留言</button>
-
-  <ul id="messageList">
-    <li>正在加载云端数据...</li>
-  </ul>
-
-  <script>
-    // 1. 初始化你的 supabase（把这里换成你第三步获取的 URL 和 Key！）
-    const supabaseUrl = 'https://usttdrudotvrnmwynfnm.supabase.co';
-    const supabaseKey = 'sb_publishable_T7gpzKyt2I0sUqsw2GhwlQ_l5n4xJB2';
-    const supabaseClient = supabase.createClient(supabaseUrl, supabaseKey);
-
-    // 2. 将数据发送到数据库
-    async function saveData() {
-      const text = document.getElementById('myInput').value;
-      if (!text) {
-          alert('请先输入内容！');
-          return;
-      }
-
-      // 告诉 supabaseClient，向 messages 表的 content 列，插入一段数据
-      const { data, error } = await supabase
-        .from('messages')
-        .insert([ { content: text } ]);
-
-      if (error) {
-        console.error("报错啦:", error);
-        alert("发送失败，请按 F12 查看控制台报错");
-      } else {
-        document.getElementById('myInput').value = ''; // 清空输入框
-        loadData(); // 发送成功后，重新读取最新数据
-      }
-    }
-
-    // 3. 从数据库读取所有数据
-    async function loadData() {
-      // 从 messages 表，选取所有列 (*) 的数据，并按创建时间倒序排列
-      const { data, error } = await supabaseClient
-        .from('messages')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (data) {
-        const list = document.getElementById('messageList');
-        list.innerHTML = ''; // 先清空“正在加载”的提示
-        
-        // 遍历数据库传回来的每一条数据，生成 <li> 标签显示出来
-        data.forEach(item => {
-          list.innerHTML += `<li>${item.content}</li>`;
-        });
-      }
-    }
-
-    // 4. 网页一打开，就立刻执行一次读取数据的操作
-    loadData();
-  </script>
-
 </body>
 </html>
