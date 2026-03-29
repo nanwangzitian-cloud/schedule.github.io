@@ -102,7 +102,7 @@
     <div id="app" class="flex flex-col lg:flex-row flex-1">
         
         <!-- Left/Top: Preview Area -->
-        <div class="flex-1 p-6 overflow-y-auto bg-gray-50 border-r border-gray-200 lg:h-screen">
+        <div class="flex-1 p-6 overflow-y-auto bg-gray-50 border-r border-gray-200 lg:h-screen" id="preview-scroll-area">
             <div class="flex justify-between items-center mb-6 no-print">
                 <h2 class="text-2xl font-bold text-gray-800">实时预览</h2>
                 <div class="flex items-center space-x-4">
@@ -157,7 +157,7 @@
                 </div>
             </div>
             
-            <div class="flex-1 overflow-y-auto p-4 space-y-6">
+            <div class="flex-1 overflow-y-auto p-4 space-y-6" id="editor-scroll-area">
                 <!-- Page Manager (Tabs) -->
                 <div class="bg-white border border-gray-200 rounded-lg p-3 shadow-sm mb-4">
                     <div class="flex justify-between items-center mb-2">
@@ -179,10 +179,29 @@
                     </div>
                 </div>
                 
+                <!-- Quick Navigation Bar -->
+                <div class="bg-white border border-gray-200 rounded-lg p-3 shadow-sm mb-4 sticky top-0 z-20">
+                    <div class="flex justify-between items-center mb-2">
+                        <h3 class="text-sm font-bold text-gray-700">快速定位</h3>
+                        <button @click="addSubject" class="text-xs bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600 shadow-sm font-medium transition-colors">
+                            + 添加新学科
+                        </button>
+                    </div>
+                    <div class="flex flex-wrap gap-2">
+                        <button v-for="(subject, sIndex) in filteredData" :key="'nav-'+subject.id" 
+                                @click="scrollToSubject(subject.id)"
+                                class="text-xs px-3 py-1.5 rounded-full border transition-colors shadow-sm"
+                                :class="getSubjectNavColorClass(subject.subjectColor || 'blue')">
+                            {{ subject.subjectName === '自定义' ? (subject.customName || '自定义') : subject.subjectName }}
+                        </button>
+                        <span v-if="filteredData.length === 0" class="text-xs text-gray-400">暂无学科数据</span>
+                    </div>
+                </div>
+                
                 <!-- Subjects Loop (Filtered) -->
-                <div v-for="(subject, sIndex) in filteredData" :key="subject.id || sIndex" class="border border-gray-200 rounded-lg p-4 bg-white shadow-sm relative group">
+                <div v-for="(subject, sIndex) in filteredData" :key="subject.id" :id="'subject-' + subject.id" class="border border-gray-200 rounded-lg p-4 bg-white shadow-sm relative group scroll-mt-20">
                     <div class="absolute top-2 right-2">
-                         <button @click="removeSubject(scheduleData.indexOf(subject))" class="text-red-400 hover:text-red-600 p-1" title="删除学科">
+                         <button @click="removeSubject(subject.id)" class="text-red-400 hover:text-red-600 p-1" title="删除学科">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" /></svg>
                         </button>
                     </div>
@@ -191,7 +210,7 @@
                         <span class="bg-blue-100 text-blue-800 text-xs font-semibold mr-2 px-2.5 py-0.5 rounded">{{ subject.schoolLevel === 'senior' ? '高中' : '初中' }}学科</span>
                     </h3>
                     
-                    <div class="grid grid-cols-2 gap-3 mb-4">
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
                         <div>
                             <label class="block text-xs font-medium text-gray-500">学科选择</label>
                             <select v-model="subject.subjectName" @change="autoMatchColor(subject)" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm border p-1">
@@ -212,13 +231,6 @@
                             <input v-if="subject.subjectName === '自定义'" v-model="subject.customName" placeholder="输入学科名称" class="mt-2 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm border p-1">
                         </div>
                         <div>
-                            <label class="block text-xs font-medium text-gray-500">所属学段</label>
-                            <select v-model="subject.schoolLevel" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm border p-1">
-                                <option value="junior">初中</option>
-                                <option value="senior">高中</option>
-                            </select>
-                        </div>
-                        <div>
                             <label class="block text-xs font-medium text-gray-500">新课数量</label>
                             <input type="number" v-model.number="subject.newCount" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm border p-1">
                         </div>
@@ -237,7 +249,10 @@
                              
                              <h4 class="text-sm font-bold text-gray-600 mb-2">卡片 {{ cIndex + 1 }}</h4>
                              <div class="grid grid-cols-1 gap-2 mb-3">
-                                <input v-model="card.cardTitle" placeholder="卡片标题 (如: 暑秋寒春·人教版)" class="block w-full rounded-md border-gray-300 border p-1 text-sm">
+                                <div class="grid grid-cols-2 gap-2">
+                                    <input v-model="card.courseType" placeholder="课程类型 (如: 暑秋寒春)" class="block w-full rounded-md border-gray-300 border p-1 text-sm">
+                                    <input v-model="card.textbookVersion" placeholder="教材版本 (如: 人教版)" class="block w-full rounded-md border-gray-300 border p-1 text-sm">
+                                </div>
                                 <div class="grid grid-cols-2 gap-2">
                                     <input v-model="card.level" placeholder="难度 (如: A)" class="block w-full rounded-md border-gray-300 border p-1 text-sm">
                                     <input v-model="card.instructor" placeholder="讲师姓名" class="block w-full rounded-md border-gray-300 border p-1 text-sm">
@@ -259,46 +274,46 @@
                                     </div>
                                     
                                     <!-- Topics Loop -->
-                                    <div class="pl-2 space-y-2">
-                                        <div v-for="(topic, tIndex) in mod.topics" :key="tIndex" class="text-sm">
-                                            <div class="flex items-center mb-1 space-x-2">
-                                                <div class="flex-1">
+                                    <div class="pl-2 space-y-4 mt-3">
+                                        <div v-for="(topic, tIndex) in mod.topics" :key="tIndex" class="text-sm border-l-2 border-blue-200 pl-3 relative">
+                                            <button @click="removeTopic(mod, tIndex)" class="absolute -left-2 -top-2 bg-white rounded-full text-red-300 hover:text-red-500 shadow-sm w-4 h-4 flex items-center justify-center text-xs">×</button>
+                                            
+                                            <div class="flex flex-col space-y-2 mb-2">
+                                                <div>
                                                     <span class="text-gray-400 text-xs block mb-0.5">专题:</span>
-                                                    <input v-model="topic.topicName" class="w-full border-b border-gray-200 focus:border-blue-400 outline-none text-xs py-0.5">
+                                                    <input v-model="topic.topicName" class="w-full border-b border-gray-200 focus:border-blue-400 outline-none text-sm py-1">
                                                 </div>
-                                                <div class="flex-1" v-if="!card.mergeTopicsAndLessons">
+                                                <div v-if="!card.mergeTopicsAndLessons">
                                                     <span class="text-gray-400 text-xs block mb-0.5">课程:</span>
-                                                    <input v-model="topic.courseName" placeholder="课程名称" class="w-full border-b border-gray-200 focus:border-blue-400 outline-none text-xs py-0.5">
+                                                    <input v-model="topic.courseName" placeholder="课程名称" class="w-full border-b border-gray-200 focus:border-blue-400 outline-none text-sm py-1">
                                                 </div>
-                                                <button @click="removeTopic(mod, tIndex)" class="text-red-300 hover:text-red-500 text-xs ml-1 self-end mb-1">×</button>
                                             </div>
                                             
                                             <!-- Lessons Loop -->
-                                            <div class="pl-4 flex flex-wrap gap-2">
-                                                <div v-for="(lesson, lIndex) in topic.lessons" :key="lIndex" class="group flex items-center bg-gray-100 rounded px-2 py-0.5 text-xs text-gray-600 border border-transparent focus-within:border-blue-300 focus-within:bg-white transition-colors">
-                                                    <input v-model="topic.lessons[lIndex]" class="bg-transparent border-none outline-none min-w-[60px] max-w-[120px] text-gray-600 p-0 m-0 focus:ring-0">
-                                                    <button @click="removeLesson(topic, lIndex)" class="ml-1 text-red-400 hover:text-red-600 opacity-0 group-hover:opacity-100 focus:opacity-100 outline-none">×</button>
+                                            <div class="mt-2">
+                                                <span class="text-gray-400 text-xs block mb-1">课次:</span>
+                                                <div class="flex flex-col gap-2">
+                                                    <div v-for="(lesson, lIndex) in topic.lessons" :key="lIndex" class="group flex items-center bg-gray-50 rounded px-2 py-1 text-sm text-gray-600 border border-gray-200 focus-within:border-blue-400 focus-within:bg-white transition-colors w-full">
+                                                        <input v-model="topic.lessons[lIndex]" class="bg-transparent border-none outline-none flex-1 text-gray-700 p-0 m-0 focus:ring-0">
+                                                        <button @click="removeLesson(topic, lIndex)" class="ml-2 text-red-400 hover:text-red-600 opacity-0 group-hover:opacity-100 focus:opacity-100 outline-none p-1">×</button>
+                                                    </div>
+                                                    <button @click="addLesson(topic)" class="w-full text-blue-500 text-xs hover:bg-blue-50 py-1.5 rounded border border-dashed border-blue-200">+ 添加课次</button>
                                                 </div>
-                                                <button @click="addLesson(topic)" class="text-blue-500 text-xs hover:bg-blue-50 px-2 rounded border border-dashed border-blue-200">+ 课次</button>
                                             </div>
                                         </div>
-                                        <button @click="addTopic(mod)" class="w-full text-center text-xs text-gray-400 hover:text-blue-500 hover:bg-gray-50 py-1 border border-dashed border-gray-200 rounded mt-1">+ 添加专题</button>
+                                        <button @click="addTopic(mod)" class="w-full text-center text-xs text-gray-500 hover:text-blue-600 hover:bg-gray-50 py-2 border border-dashed border-gray-300 rounded">+ 添加新专题</button>
                                     </div>
                                 </div>
                                 <button @click="addModule(card)" class="w-full text-center text-sm text-blue-600 hover:bg-blue-50 py-1 border border-dashed border-blue-300 rounded">+ 添加模块</button>
                              </div>
                         </div>
                         <button @click="addCard(subject)" class="w-full py-2 border-2 border-dashed border-gray-300 rounded text-gray-500 hover:border-blue-400 hover:text-blue-500 text-sm font-bold">
-                            + 添加课程卡片
+                            + 添加课程类型和教材版本
                         </button>
                     </div>
 
                 </div>
 
-                <button @click="addSubject" class="w-full py-3 bg-blue-500 text-white rounded-lg shadow hover:bg-blue-600 font-bold">
-                    + 添加新学科
-                </button>
-                
                 <div class="h-10"></div> <!-- Spacer -->
             </div>
         </div>
@@ -354,11 +369,12 @@
                 }
             }
 
-            data.forEach(subject => {
+            data.forEach((subject, index) => {
                 // 1. Create Subject Banner
+                const subjectId = subject.id || index;
                 const subjectColorClass = getSubjectColorClass(subject.subjectColor);
                 const bannerHTML = `
-                    <div class="flex items-stretch mb-6 h-14 shadow-sm rounded-lg overflow-hidden bg-white">
+                    <div id="preview-subject-${subjectId}" class="flex items-stretch mb-6 h-14 shadow-sm rounded-lg overflow-hidden bg-white scroll-mt-6">
                         <div class="${subjectColorClass} text-white font-bold text-xl px-8 pr-12 flex items-center subject-banner-left relative z-10" style="min-width: 120px;">
                             ${subject.subjectName === '自定义' ? (subject.customName || '自定义') : subject.subjectName}
                         </div>
@@ -379,6 +395,17 @@
                         
                         // Determine table headers based on merge flag
                         const isMerged = card.mergeTopicsAndLessons !== false; // default true
+                        
+                        // Construct the display title
+                        const typeStr = card.courseType ? card.courseType.trim() : '';
+                        const versionStr = card.textbookVersion ? card.textbookVersion.trim() : '';
+                        let displayTitle = '';
+                        if (typeStr && versionStr) {
+                            displayTitle = `${typeStr}·${versionStr}`;
+                        } else {
+                            displayTitle = typeStr || versionStr || card.cardTitle || '未命名课程';
+                        }
+
                         const headerHTML = isMerged ? `
                                             <tr class="text-lg">
                                                 <th style="width: 15%;">模块</th>
@@ -400,7 +427,7 @@
                             <div class="border border-gray-200 rounded-lg overflow-hidden mb-8 shadow-sm bg-white">
                                 <!-- Card Header -->
                                 <div class="card-header-gradient px-4 py-3 flex justify-between items-center">
-                                    <h3 class="text-gray-900 font-bold text-2xl tracking-wide text-shadow-sm">${card.cardTitle}</h3>
+                                    <h3 class="text-gray-900 font-bold text-2xl tracking-wide text-shadow-sm">${displayTitle}</h3>
                                     ${card.level ? `<span class="level-badge text-gray-900 font-bold px-3 py-0.5 text-xl">${card.level}</span>` : ''}
                                 </div>
                                 
@@ -710,7 +737,37 @@
 
                 // Filter data based on current level
                 const filteredData = computed(() => {
-                    return scheduleData.value.filter(s => (s.schoolLevel || 'junior') === currentLevel.value);
+                    const subjectOrder = {
+                        '语文': 1,
+                        '数学': 2,
+                        '英语': 3,
+                        '物理': 4,
+                        '化学': 5,
+                        '生物': 6,
+                        '历史': 7,
+                        '地理': 8,
+                        '政治': 9,
+                        '道法': 10,
+                        '科学': 11
+                    };
+
+                    const filtered = scheduleData.value.filter(s => (s.schoolLevel || 'junior') === currentLevel.value);
+                    
+                    // Use slice().sort() to prevent mutating the original reactive array
+                    return filtered.slice().sort((a, b) => {
+                        const nameA = a.subjectName === '自定义' ? (a.customName || '') : a.subjectName;
+                        const nameB = b.subjectName === '自定义' ? (b.customName || '') : b.subjectName;
+                        
+                        const orderA = subjectOrder[nameA] || 999;
+                        const orderB = subjectOrder[nameB] || 999;
+                        
+                        if (orderA !== orderB) {
+                            return orderA - orderB;
+                        }
+                        
+                        // If they have the same order (e.g., both "自定义" or "新学科"), sort by ID to maintain stability
+                        return (a.id || '').localeCompare(b.id || '');
+                    });
                 });
 
                 /*
@@ -734,6 +791,13 @@
 
                 // --- Real-time Sync Logic (Supabase) ---
                 onMounted(() => {
+                    // Initialize legacy data with IDs
+                    scheduleData.value.forEach((subject, idx) => {
+                        if (!subject.id) {
+                            subject.id = 'sub_' + Date.now() + '_' + idx;
+                        }
+                    });
+
                     renderSchedule(filteredData.value, 'schedule-content-area', globalConfig.value);
 
                     // Global Undo Listener
@@ -1106,14 +1170,16 @@
 
                 // Level 1: Subject
                 const addSubject = () => {
-                    scheduleData.value.push({
+                    const newSub = {
+                        id: 'sub_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
                         subjectName: "新学科",
                         schoolLevel: currentLevel.value,
                         subjectColor: "blue", // Default
                         newCount: 0,
                         showNewBadge: true,
                         cards: []
-                    });
+                    };
+                    scheduleData.value.push(newSub);
                     
                     // Force a re-render and sync
                     nextTick(() => {
@@ -1137,21 +1203,83 @@
                     else if (name === '政治') subject.subjectColor = 'politics';
                     else if (name === '道法') subject.subjectColor = 'politics'; // Share orange color
                     else if (name === '科学' && subject.schoolLevel === 'junior') subject.subjectColor = 'science'; 
+                    else if (name === '科学' && subject.schoolLevel === 'senior') subject.subjectColor = 'science'; 
                     else if (name === '自定义') subject.subjectColor = 'blue'; // Default for custom
                 };
-                const removeSubject = (index) => {
-                    if(confirm('确定删除该学科及其所有数据吗？')) {
-                        scheduleData.value.splice(index, 1);
-                        nextTick(() => {
-                            debouncedSaveToCloud();
+
+                // Watch scheduleData for subject name changes to auto-update color without manual @change
+                watch(scheduleData, (newData) => {
+                    if (isRemoteUpdate || isUndoing) return;
+                    newData.forEach(subject => {
+                        // Automatically update color if it matches standard names
+                        if (subject.subjectName && subject.subjectName !== '自定义' && subject.subjectName !== '新学科') {
+                            autoMatchColor(subject);
+                        }
+                    });
+                }, { deep: true, flush: 'post' });
+
+                const getSubjectNavColorClass = (colorName) => {
+                    const map = {
+                        'chinese': 'bg-red-50 text-red-700 border-red-200 hover:bg-red-100',
+                        'math': 'bg-sky-50 text-sky-700 border-sky-200 hover:bg-sky-100',
+                        'english': 'bg-pink-50 text-pink-700 border-pink-200 hover:bg-pink-100',
+                        'physics': 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100',
+                        'chemistry': 'bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100',
+                        'biology': 'bg-lime-50 text-lime-700 border-lime-200 hover:bg-lime-100',
+                        'geography': 'bg-green-50 text-green-700 border-green-200 hover:bg-green-100',
+                        'history': 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100',
+                        'politics': 'bg-orange-50 text-orange-700 border-orange-200 hover:bg-orange-100',
+                        'science': 'bg-fuchsia-50 text-fuchsia-700 border-fuchsia-200 hover:bg-fuchsia-100',
+                        'blue': 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100'
+                    };
+                    return map[colorName.toLowerCase()] || map['blue'];
+                };
+
+                const scrollToSubject = (id) => {
+                    const editorId = 'subject-' + id;
+                    const previewId = 'preview-subject-' + id;
+                    
+                    // Scroll Editor
+                    const editorElement = document.getElementById(editorId);
+                    const editorContainer = document.getElementById('editor-scroll-area');
+                    if (editorElement && editorContainer) {
+                        const containerTop = editorContainer.getBoundingClientRect().top;
+                        const elementTop = editorElement.getBoundingClientRect().top;
+                        editorContainer.scrollBy({
+                            top: elementTop - containerTop - 120, // 120px offset for the sticky nav bar
+                            behavior: 'smooth'
                         });
+                    }
+
+                    // Scroll Preview
+                    const previewElement = document.getElementById(previewId);
+                    const previewContainer = document.getElementById('preview-scroll-area');
+                    if (previewElement && previewContainer) {
+                        const containerTop = previewContainer.getBoundingClientRect().top;
+                        const elementTop = previewElement.getBoundingClientRect().top;
+                        previewContainer.scrollBy({
+                            top: elementTop - containerTop - 20, // small offset for visual comfort
+                            behavior: 'smooth'
+                        });
+                    }
+                };
+                const removeSubject = (id) => {
+                    if(confirm('确定删除该学科及其所有数据吗？')) {
+                        const index = scheduleData.value.findIndex(s => s.id === id);
+                        if (index !== -1) {
+                            scheduleData.value.splice(index, 1);
+                            nextTick(() => {
+                                debouncedSaveToCloud();
+                            });
+                        }
                     }
                 };
 
                 // Level 2: Card
                 const addCard = (subject) => {
                     subject.cards.push({
-                        cardTitle: "新课程卡片",
+                        courseType: "暑秋寒春",
+                        textbookVersion: "人教版",
                         level: "A",
                         instructor: "讲师名",
                         modules: []
@@ -1177,7 +1305,7 @@
                     module.topics.push({
                         topicName: "新专题",
                         courseName: "", // Initialize courseName
-                        lessons: ["新课程"]
+                        lessons: ["新课次"]
                     });
                 };
                 const removeTopic = (module, tIndex) => {
@@ -1186,7 +1314,7 @@
 
                 // Level 5: Lesson
                 const addLesson = (topic) => {
-                    const lessonName = prompt("请输入课程名称：", "新课程");
+                    const lessonName = prompt("请输入课次名称：", "新课次");
                     if (lessonName) {
                         topic.lessons.push(lessonName);
                     }
@@ -1198,7 +1326,7 @@
                 // --- Excel Export Logic ---
                 const exportToExcel = () => {
                     // We need to flatten the scheduleData into rows
-                    const headers = ['学段', '学科', '新课数量', '显示NEW', '卡片标题', '难度', '讲师', '模块', '专题', '课程', '课次'];
+                    const headers = ['学段', '学科', '新课数量', '显示NEW', '课程类型·教材版本', '难度', '讲师', '模块', '专题', '课程', '课次'];
                     
                     const flattenData = (level) => {
                         const rows = [];
@@ -1222,7 +1350,7 @@
                                                 subject.subjectName === '自定义' ? subject.customName : subject.subjectName,
                                                 subject.newCount,
                                                 subject.showNewBadge ? '是' : '否',
-                                                card.cardTitle,
+                                                (card.courseType || '') + '·' + (card.textbookVersion || ''),
                                                 card.level,
                                                 card.instructor,
                                                 mod.moduleName,
@@ -1249,7 +1377,7 @@
                         {wch: 8},  // 学科
                         {wch: 10}, // 新课数量
                         {wch: 8},  // 显示NEW
-                        {wch: 20}, // 卡片标题
+                        {wch: 20}, // 课程类型·教材版本
                         {wch: 6},  // 难度
                         {wch: 10}, // 讲师
                         {wch: 15}, // 模块
@@ -1307,7 +1435,8 @@
                     addCard, removeCard,
                     addModule, removeModule,
                     addTopic, removeTopic,
-                    addLesson, removeLesson
+                    addLesson, removeLesson,
+                    getSubjectNavColorClass, scrollToSubject
                 };
             }
         }).mount('#app');
