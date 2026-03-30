@@ -1,7 +1,6 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>课程表生成器</title>
@@ -9,6 +8,7 @@
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
     <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&display=swap');
         
@@ -162,7 +162,7 @@
                 <div class="bg-white border border-gray-200 rounded-lg p-3 shadow-sm mb-4">
                     <div class="flex justify-between items-center mb-2">
                         <h3 class="text-sm font-bold text-gray-700">表格页管理</h3>
-                        <button @click="addNewPage" class="text-xs bg-blue-50 text-blue-600 px-2 py-1 rounded hover:bg-blue-100">+ 新建一页</button>
+                        <button v-if="isLocalhost" @click="addNewPage" class="text-xs bg-blue-50 text-blue-600 px-2 py-1 rounded hover:bg-blue-100">+ 新建一页</button>
                     </div>
                     <div class="flex flex-wrap gap-2">
                         <div v-for="(page, index) in savedPages" :key="page.id" 
@@ -170,15 +170,15 @@
                              :class="{'bg-blue-50 border-blue-300 text-blue-700': currentPageId === page.id, 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100': currentPageId !== page.id}"
                              @click="switchPage(page.id)">
                             
-                            <span v-if="editingPageId !== page.id">{{ page.name }}</span>
+                            <span v-if="editingPageId !== page.id || !isLocalhost">{{ page.name }}</span>
                             <input v-else v-model="page.name" @blur="stopEditingPage(page)" @keyup.enter="stopEditingPage(page)" class="w-20 px-1 text-xs border border-blue-400 rounded outline-none" autofocus @click.stop>
                             
-                            <button @click.stop="startEditingPage(page)" v-if="editingPageId !== page.id" class="text-gray-400 hover:text-blue-500 ml-1" title="重命名">✎</button>
-                            <button @click.stop="deletePage(index)" v-if="savedPages.length > 1" class="text-gray-400 hover:text-red-500 ml-1" title="删除">×</button>
+                            <button @click.stop="startEditingPage(page)" v-if="isLocalhost && editingPageId !== page.id" class="text-gray-400 hover:text-blue-500 ml-1" title="重命名">✎</button>
+                            <button @click.stop="deletePage(index)" v-if="isLocalhost && savedPages.length > 1" class="text-gray-400 hover:text-red-500 ml-1" title="删除">×</button>
                         </div>
                     </div>
                 </div>
-                
+
                 <!-- Quick Navigation Bar -->
                 <div class="bg-white border border-gray-200 rounded-lg p-3 shadow-sm mb-4 sticky top-0 z-20">
                     <div class="flex justify-between items-center mb-2">
@@ -245,7 +245,10 @@
                     <!-- Cards Loop -->
                     <div class="space-y-4 ml-2 border-l-2 border-gray-100 pl-3">
                         <div v-for="(card, cIndex) in subject.cards" :key="cIndex" class="bg-gray-50 p-3 rounded border border-gray-200 relative">
-                             <button @click="removeCard(subject, cIndex)" class="absolute top-2 right-2 text-red-400 hover:text-red-600 text-xs">删除卡片</button>
+                             <div class="absolute top-2 right-2 flex space-x-2">
+                                 <button @click="copyCard(subject, cIndex)" class="text-blue-400 hover:text-blue-600 text-xs">复制</button>
+                                 <button @click="removeCard(subject, cIndex)" class="text-red-400 hover:text-red-600 text-xs">删除</button>
+                             </div>
                              
                              <h4 class="text-sm font-bold text-gray-600 mb-2">卡片 {{ cIndex + 1 }}</h4>
                              <div class="grid grid-cols-1 gap-2 mb-3">
@@ -268,9 +271,16 @@
                              <!-- Modules Loop -->
                              <div class="space-y-3">
                                 <div v-for="(mod, mIndex) in card.modules" :key="mIndex" class="bg-white p-2 rounded border border-gray-200">
-                                    <div class="flex justify-between items-center mb-2">
-                                        <input v-model="mod.moduleName" placeholder="模块名称 (如: 春季七年级)" class="font-medium text-sm text-gray-700 w-full border-b border-dashed border-gray-300 focus:border-blue-500 outline-none mr-2">
-                                        <button @click="removeModule(card, mIndex)" class="text-red-300 hover:text-red-500 text-xs">×</button>
+                                    <div class="flex flex-col mb-2 space-y-1 relative">
+                                        <button @click="removeModule(card, mIndex)" class="absolute top-0 right-0 text-red-300 hover:text-red-500 text-xs">×</button>
+                                        <div class="flex items-center pr-4">
+                                            <span class="text-gray-400 text-xs mr-2 shrink-0">模块:</span>
+                                            <input v-model="mod.moduleName" placeholder="模块名称 (如: 春季)" class="font-medium text-sm text-gray-700 w-full border-b border-dashed border-gray-300 focus:border-blue-500 outline-none">
+                                        </div>
+                                        <div class="flex items-center pr-4">
+                                            <span class="text-gray-400 text-xs mr-2 shrink-0">年级:</span>
+                                            <input v-model="mod.gradeName" placeholder="年级 (如: 七年级)" class="text-sm text-gray-600 w-full border-b border-dashed border-gray-300 focus:border-blue-500 outline-none">
+                                        </div>
                                     </div>
                                     
                                     <!-- Topics Loop -->
@@ -371,7 +381,8 @@
 
             data.forEach((subject, index) => {
                 // 1. Create Subject Banner
-                const subjectId = subject.id || index;
+                // The id should match what Vue uses for the quick navigation. Vue passes subject.id
+                const subjectId = subject.id;
                 const subjectColorClass = getSubjectColorClass(subject.subjectColor);
                 const bannerHTML = `
                     <div id="preview-subject-${subjectId}" class="flex items-stretch mb-6 h-14 shadow-sm rounded-lg overflow-hidden bg-white scroll-mt-6">
@@ -513,9 +524,13 @@
                     topic.lessons.forEach((lesson, lessonIndex) => {
                         html += '<tr class="text-2xl">';
 
-                        // Column 1: Module
+                        // Column 1: Module (with Grade below it)
                         if (isFirstRowOfModule) {
-                            html += `<td rowspan="${totalModuleRows}" class="font-bold text-gray-700 text-xl">${mod.moduleName}</td>`;
+                            const gradeHtml = mod.gradeName ? `<div class="mt-1">${mod.gradeName}</div>` : '';
+                            html += `<td rowspan="${totalModuleRows}" class="font-bold text-gray-700 text-xl leading-tight">
+                                        <div>${mod.moduleName || ''}</div>
+                                        ${gradeHtml}
+                                     </td>`;
                             isFirstRowOfModule = false;
                         }
 
@@ -604,8 +619,10 @@
                 const supabaseKey = 'sb_publishable_T7gpzKyt2I0sUqsw2GhwlQ_l5n4xJB2';
                 const supabaseClient = supabase.createClient(supabaseUrl, supabaseKey);
 
-                // Initialize from localStorage to avoid white screen before cloud loads
+                // Initialize from localStorage if available, otherwise use default
                 const savedPagesData = localStorage.getItem('schedulePages');
+                
+                // State
                 const savedPages = ref(savedPagesData ? JSON.parse(savedPagesData) : [
                     { id: Date.now(), name: new Date().toLocaleDateString().replace(/\//g, '-'), data: JSON.parse(JSON.stringify(defaultSampleData)) }
                 ]);
@@ -622,6 +639,175 @@
                 const globalConfig = ref(savedConfig ? JSON.parse(savedConfig) : { logoImage: null });
 
                 const currentLevel = ref('junior'); // 'junior' or 'senior'
+                
+                // Page Management Logic
+                const switchPage = (id) => {
+                    if (isRemoteUpdate) return;
+                    
+                    // Force push history before switching
+                    clearTimeout(historyDebounce);
+                    const currentStateStr = JSON.stringify(scheduleData.value);
+                    if (currentStateStr !== lastStateStr) {
+                        historyStack.push({ pageId: currentPageId.value, dataStr: lastStateStr });
+                        if (historyStack.length > 50) historyStack.shift();
+                    }
+
+                    // Save current data to current page before switching
+                    const currentPageIndex = savedPages.value.findIndex(p => p.id === currentPageId.value);
+                    if (currentPageIndex !== -1) {
+                        savedPages.value[currentPageIndex].data = JSON.parse(JSON.stringify(scheduleData.value));
+                    }
+                    
+                    // Switch to new page
+                    currentPageId.value = id;
+                    const targetPage = savedPages.value.find(p => p.id === id);
+                    if (targetPage) {
+                        scheduleData.value = JSON.parse(JSON.stringify(targetPage.data));
+                        lastStateStr = JSON.stringify(targetPage.data); // Update last state to prevent false history push
+                    }
+                    
+                    // Delay saving to let Vue finish the state update and avoid watcher conflicts
+                    nextTick(() => {
+                        debouncedSaveToCloud();
+                    });
+                };
+
+                const addNewPage = () => {
+                    // Deep copy current page data
+                    const newData = JSON.parse(JSON.stringify(scheduleData.value));
+                    
+                    // Clear out lessons, leaving one empty lesson per topic, and reset newCount
+                    newData.forEach(subject => {
+                        subject.newCount = 0;
+                        if (subject.cards) {
+                            subject.cards.forEach(card => {
+                                if (card.modules) {
+                                    card.modules.forEach(mod => {
+                                        if (mod.topics) {
+                                            mod.topics.forEach(topic => {
+                                                topic.lessons = [""]; // Leave one empty lesson slot
+                                            });
+                                        }
+                                    });
+                                }
+                            });
+                        }
+                    });
+
+                    const newPage = {
+                        id: Date.now(),
+                        name: new Date().toLocaleDateString().replace(/\//g, '-') + ' 新页',
+                        data: newData // Use copied and cleared data
+                    };
+                    savedPages.value.push(newPage);
+                    
+                    // Allow Vue to process the push before switching
+                    nextTick(() => {
+                        switchPage(newPage.id);
+                        debouncedSaveToCloud();
+                        // Also trigger sync
+                        setTimeout(() => {
+                            debouncedSaveToCloud();
+                        }, 100);
+                    });
+                };
+
+                const deletePage = (index) => {
+                    if (savedPages.value.length <= 1) {
+                        alert("至少保留一个表格页！");
+                        return;
+                    }
+                    if (confirm(`确定要删除 "${savedPages.value[index].name}" 吗？`)) {
+                        const deletedId = savedPages.value[index].id;
+                        savedPages.value.splice(index, 1);
+                        if (currentPageId.value === deletedId) {
+                            switchPage(savedPages.value[0].id);
+                        } else {
+                            debouncedSaveToCloud();
+                        }
+                        
+                        setTimeout(() => {
+                            debouncedSaveToCloud();
+                        }, 100);
+                    }
+                };
+
+                const startEditingPage = (page) => {
+                    editingPageId.value = page.id;
+                };
+
+                const stopEditingPage = (page) => {
+                    editingPageId.value = null;
+                    if (!page.name.trim()) {
+                        page.name = "未命名";
+                    }
+                    debouncedSaveToCloud();
+                    setTimeout(() => {
+                        debouncedSaveToCloud();
+                    }, 100);
+                };
+
+                
+                // Filter data based on current level
+                const filteredData = computed(() => {
+                    const subjectOrder = {
+                        '语文': 1,
+                        '数学': 2,
+                        '英语': 3,
+                        '物理': 4,
+                        '化学': 5,
+                        '生物': 6,
+                        '历史': 7,
+                        '地理': 8,
+                        '政治': 9,
+                        '道法': 10,
+                        '科学': 11
+                    };
+
+                    const filtered = scheduleData.value.filter(s => (s.schoolLevel || 'junior') === currentLevel.value);
+                    
+                    // Ensure every item has an id before sorting and returning
+                    filtered.forEach((subject, idx) => {
+                        if (!subject.id) {
+                            subject.id = 'sub_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+                        }
+                    });
+
+                    // Use slice().sort() to prevent mutating the original reactive array
+                    return filtered.slice().sort((a, b) => {
+                        const nameA = a.subjectName === '自定义' ? (a.customName || '') : a.subjectName;
+                        const nameB = b.subjectName === '自定义' ? (b.customName || '') : b.subjectName;
+                        
+                        const orderA = subjectOrder[nameA] || 999;
+                        const orderB = subjectOrder[nameB] || 999;
+                        
+                        if (orderA !== orderB) {
+                            return orderA - orderB;
+                        }
+                        
+                        // If they have the same order (e.g., both "自定义" or "新学科"), sort by ID to maintain stability
+                        return (a.id || '').localeCompare(b.id || '');
+                    });
+                });
+
+                /*
+                // Update view whenever filtered data changes AND save to localStorage
+                watch(scheduleData, (newValue) => {
+                    localStorage.setItem('scheduleData', JSON.stringify(newValue));
+                    renderSchedule(filteredData.value, 'schedule-content-area', globalConfig.value);
+                }, { deep: true, immediate: true });
+                
+                // Watch globalConfig and save to localStorage
+                watch(globalConfig, (newValue) => {
+                    localStorage.setItem('globalConfig', JSON.stringify(newValue));
+                    renderSchedule(filteredData.value, 'schedule-content-area', newValue);
+                }, { deep: true });
+                */
+
+                // Watch filteredData separately to ensure render updates when switching tabs or modifying filtered items
+                watch(filteredData, (newValue) => {
+                    renderSchedule(newValue, 'schedule-content-area', globalConfig.value);
+                }, { deep: true });
 
                 // --- Real-time Sync Logic (Supabase) ---
                 let isRemoteUpdate = false;
@@ -661,135 +847,7 @@
                         saveToCloud();
                     }, 1000);
                 };
-                
-                // Page Management Logic
-                const switchPage = (id) => {
-                    if (isRemoteUpdate) return;
-                    
-                    // Force push history before switching
-                    clearTimeout(historyDebounce);
-                    const currentStateStr = JSON.stringify(scheduleData.value);
-                    if (currentStateStr !== lastStateStr) {
-                        historyStack.push({ pageId: currentPageId.value, dataStr: lastStateStr });
-                        if (historyStack.length > 50) historyStack.shift();
-                    }
 
-                    // Save current data to current page before switching
-                    const currentPageIndex = savedPages.value.findIndex(p => p.id === currentPageId.value);
-                    if (currentPageIndex !== -1) {
-                        savedPages.value[currentPageIndex].data = JSON.parse(JSON.stringify(scheduleData.value));
-                    }
-                    
-                    // Switch to new page
-                    currentPageId.value = id;
-                    const targetPage = savedPages.value.find(p => p.id === id);
-                    if (targetPage) {
-                        scheduleData.value = JSON.parse(JSON.stringify(targetPage.data));
-                        lastStateStr = JSON.stringify(targetPage.data); // Update last state to prevent false history push
-                    }
-                    
-                    nextTick(() => {
-                        debouncedSaveToCloud();
-                    });
-                };
-
-                const addNewPage = () => {
-                    const newPage = {
-                        id: Date.now(),
-                        name: new Date().toLocaleDateString().replace(/\//g, '-') + ' 新页',
-                        data: [] // Empty schedule
-                    };
-                    savedPages.value.push(newPage);
-                    
-                    nextTick(() => {
-                        switchPage(newPage.id);
-                        debouncedSaveToCloud();
-                    });
-                };
-
-                const deletePage = (index) => {
-                    if (savedPages.value.length <= 1) {
-                        alert("至少保留一个表格页！");
-                        return;
-                    }
-                    if (confirm(`确定要删除 "${savedPages.value[index].name}" 吗？`)) {
-                        const deletedId = savedPages.value[index].id;
-                        savedPages.value.splice(index, 1);
-                        if (currentPageId.value === deletedId) {
-                            switchPage(savedPages.value[0].id);
-                        } else {
-                            debouncedSaveToCloud();
-                        }
-                    }
-                };
-
-                const startEditingPage = (page) => {
-                    editingPageId.value = page.id;
-                };
-
-                const stopEditingPage = (page) => {
-                    editingPageId.value = null;
-                    if (!page.name.trim()) {
-                        page.name = "未命名";
-                    }
-                    debouncedSaveToCloud();
-                };
-
-                // Filter data based on current level
-                const filteredData = computed(() => {
-                    const subjectOrder = {
-                        '语文': 1,
-                        '数学': 2,
-                        '英语': 3,
-                        '物理': 4,
-                        '化学': 5,
-                        '生物': 6,
-                        '历史': 7,
-                        '地理': 8,
-                        '政治': 9,
-                        '道法': 10,
-                        '科学': 11
-                    };
-
-                    const filtered = scheduleData.value.filter(s => (s.schoolLevel || 'junior') === currentLevel.value);
-                    
-                    // Use slice().sort() to prevent mutating the original reactive array
-                    return filtered.slice().sort((a, b) => {
-                        const nameA = a.subjectName === '自定义' ? (a.customName || '') : a.subjectName;
-                        const nameB = b.subjectName === '自定义' ? (b.customName || '') : b.subjectName;
-                        
-                        const orderA = subjectOrder[nameA] || 999;
-                        const orderB = subjectOrder[nameB] || 999;
-                        
-                        if (orderA !== orderB) {
-                            return orderA - orderB;
-                        }
-                        
-                        // If they have the same order (e.g., both "自定义" or "新学科"), sort by ID to maintain stability
-                        return (a.id || '').localeCompare(b.id || '');
-                    });
-                });
-
-                /*
-                // Update view whenever filtered data changes AND save to localStorage
-                watch(scheduleData, (newValue) => {
-                    localStorage.setItem('scheduleData', JSON.stringify(newValue));
-                    renderSchedule(filteredData.value, 'schedule-content-area', globalConfig.value);
-                }, { deep: true, immediate: true });
-                
-                // Watch globalConfig and save to localStorage
-                watch(globalConfig, (newValue) => {
-                    localStorage.setItem('globalConfig', JSON.stringify(newValue));
-                    renderSchedule(filteredData.value, 'schedule-content-area', newValue);
-                }, { deep: true });
-                */
-
-                // Watch filteredData separately to ensure render updates when switching tabs or modifying filtered items
-                watch(filteredData, (newValue) => {
-                    renderSchedule(newValue, 'schedule-content-area', globalConfig.value);
-                }, { deep: true });
-
-                // --- Real-time Sync Logic (Supabase) ---
                 onMounted(() => {
                     // Initialize legacy data with IDs
                     scheduleData.value.forEach((subject, idx) => {
@@ -804,7 +862,10 @@
                     window.addEventListener('keydown', (e) => {
                         if (e.ctrlKey && e.key === 'z') {
                             const activeTag = document.activeElement ? document.activeElement.tagName.toLowerCase() : '';
-                            if (activeTag === 'input' || activeTag === 'textarea' || activeTag === 'select') return;
+                            // Let native browser undo handle text input
+                            if (activeTag === 'input' || activeTag === 'textarea' || activeTag === 'select') {
+                                return;
+                            }
                             e.preventDefault();
                             undo();
                         }
@@ -922,11 +983,24 @@
                         }
                     }, 500);
                     
+                    // Save to LocalStorage (always keep local backup)
+                    // We need to avoid circular calls to debouncedSaveToCloud since savePagesToStorage also calls it
+                    const currentPageIndex = savedPages.value.findIndex(p => p.id === currentPageId.value);
+                    if (currentPageIndex !== -1) {
+                        savedPages.value[currentPageIndex].data = JSON.parse(JSON.stringify(newSchedule));
+                    }
+                    localStorage.setItem('schedulePages', JSON.stringify(savedPages.value));
+                    localStorage.setItem('globalConfig', JSON.stringify(newConfig));
+                    
                     // Render
                     renderSchedule(filteredData.value, 'schedule-content-area', newConfig);
 
-                    // Sync
-                    debouncedSaveToCloud();
+                    // Emit to Server if it's a local change
+                    // Add a small debounce to prevent emit storms when typing
+                    clearTimeout(window.syncTimeout);
+                    window.syncTimeout = setTimeout(() => {
+                        debouncedSaveToCloud();
+                    }, 500);
                 }, { deep: true });
 
                 // We also need to watch currentLevel so that when user switches tabs, the view updates immediately
@@ -934,12 +1008,18 @@
                     nextTick(() => {
                         renderSchedule(filteredData.value, 'schedule-content-area', globalConfig.value);
                     });
-                });
+                }, { immediate: true });
 
                 // Watch savedPages to emit changes when tabs are added/renamed/deleted
                 watch(savedPages, (newPages, oldPages) => {
                     if (isRemoteUpdate) return;
-                    debouncedSaveToCloud();
+                    localStorage.setItem('schedulePages', JSON.stringify(newPages));
+                    
+                    // Add debounce here to prevent loops with switchPage
+                    clearTimeout(window.pagesSyncTimeout);
+                    window.pagesSyncTimeout = setTimeout(() => {
+                        debouncedSaveToCloud();
+                    }, 500);
                 }, { deep: true });
 
                 // --- Actions ---
@@ -1184,6 +1264,7 @@
                     // Force a re-render and sync
                     nextTick(() => {
                         debouncedSaveToCloud();
+                        debouncedSaveToCloud();
                     });
                 };
                 
@@ -1236,32 +1317,35 @@
                 };
 
                 const scrollToSubject = (id) => {
-                    const editorId = 'subject-' + id;
-                    const previewId = 'preview-subject-' + id;
-                    
-                    // Scroll Editor
-                    const editorElement = document.getElementById(editorId);
-                    const editorContainer = document.getElementById('editor-scroll-area');
-                    if (editorElement && editorContainer) {
-                        const containerTop = editorContainer.getBoundingClientRect().top;
-                        const elementTop = editorElement.getBoundingClientRect().top;
-                        editorContainer.scrollBy({
-                            top: elementTop - containerTop - 120, // 120px offset for the sticky nav bar
-                            behavior: 'smooth'
-                        });
-                    }
+                    // Make sure DOM is fully updated before attempting to scroll
+                    nextTick(() => {
+                        const editorId = 'subject-' + id;
+                        const previewId = 'preview-subject-' + id;
+                        
+                        // Scroll Editor
+                        const editorElement = document.getElementById(editorId);
+                        const editorContainer = document.getElementById('editor-scroll-area');
+                        if (editorElement && editorContainer) {
+                            // Calculate absolute target position
+                            const targetPosition = editorElement.offsetTop - 120; // 120px offset for sticky header
+                            editorContainer.scrollTo({
+                                top: targetPosition,
+                                behavior: 'smooth'
+                            });
+                        }
 
-                    // Scroll Preview
-                    const previewElement = document.getElementById(previewId);
-                    const previewContainer = document.getElementById('preview-scroll-area');
-                    if (previewElement && previewContainer) {
-                        const containerTop = previewContainer.getBoundingClientRect().top;
-                        const elementTop = previewElement.getBoundingClientRect().top;
-                        previewContainer.scrollBy({
-                            top: elementTop - containerTop - 20, // small offset for visual comfort
-                            behavior: 'smooth'
-                        });
-                    }
+                        // Scroll Preview
+                        const previewElement = document.getElementById(previewId);
+                        const previewContainer = document.getElementById('preview-scroll-area');
+                        if (previewElement && previewContainer) {
+                            // Calculate absolute target position
+                            const targetPosition = previewElement.offsetTop - 20; // small visual offset
+                            previewContainer.scrollTo({
+                                top: targetPosition,
+                                behavior: 'smooth'
+                            });
+                        }
+                    });
                 };
                 const removeSubject = (id) => {
                     if(confirm('确定删除该学科及其所有数据吗？')) {
@@ -1269,6 +1353,7 @@
                         if (index !== -1) {
                             scheduleData.value.splice(index, 1);
                             nextTick(() => {
+                                debouncedSaveToCloud();
                                 debouncedSaveToCloud();
                             });
                         }
@@ -1285,6 +1370,15 @@
                         modules: []
                     });
                 };
+                const copyCard = (subject, cIndex) => {
+                    // Deep copy the selected card
+                    const cardToCopy = subject.cards[cIndex];
+                    if (cardToCopy) {
+                        const newCard = JSON.parse(JSON.stringify(cardToCopy));
+                        // Insert the copied card right after the original one
+                        subject.cards.splice(cIndex + 1, 0, newCard);
+                    }
+                };
                 const removeCard = (subject, cIndex) => {
                     subject.cards.splice(cIndex, 1);
                 };
@@ -1293,6 +1387,7 @@
                 const addModule = (card) => {
                     card.modules.push({
                         moduleName: "新模块",
+                        gradeName: "",
                         topics: []
                     });
                 };
@@ -1314,10 +1409,9 @@
 
                 // Level 5: Lesson
                 const addLesson = (topic) => {
-                    const lessonName = prompt("请输入课次名称：", "新课次");
-                    if (lessonName) {
-                        topic.lessons.push(lessonName);
-                    }
+                    // Previously this used a prompt(), which could block or cause issues. 
+                    // Since we have direct inline editing now, we just add an empty string.
+                    topic.lessons.push("");
                 };
                 const removeLesson = (topic, lIndex) => {
                     topic.lessons.splice(lIndex, 1);
@@ -1326,7 +1420,7 @@
                 // --- Excel Export Logic ---
                 const exportToExcel = () => {
                     // We need to flatten the scheduleData into rows
-                    const headers = ['学段', '学科', '新课数量', '显示NEW', '课程类型·教材版本', '难度', '讲师', '模块', '专题', '课程', '课次'];
+                    const headers = ['学段', '学科', '新课数量', '显示NEW', '课程类型·教材版本', '难度', '讲师', '模块', '年级', '专题', '课程', '课次'];
                     
                     const flattenData = (level) => {
                         const rows = [];
@@ -1354,6 +1448,7 @@
                                                 card.level,
                                                 card.instructor,
                                                 mod.moduleName,
+                                                mod.gradeName || '',
                                                 topic.topicName,
                                                 topic.courseName || '',
                                                 lesson
@@ -1381,6 +1476,7 @@
                         {wch: 6},  // 难度
                         {wch: 10}, // 讲师
                         {wch: 15}, // 模块
+                        {wch: 10}, // 年级
                         {wch: 15}, // 专题
                         {wch: 15}, // 课程
                         {wch: 20}  // 课次
@@ -1432,7 +1528,7 @@
                     copyJSON,
                     exportImage,
                     addSubject, removeSubject, autoMatchColor,
-                    addCard, removeCard,
+                    addCard, copyCard, removeCard,
                     addModule, removeModule,
                     addTopic, removeTopic,
                     addLesson, removeLesson,
