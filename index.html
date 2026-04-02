@@ -263,7 +263,7 @@
                                 <div class="flex items-center">
                                     <label class="inline-flex items-center cursor-pointer">
                                         <input type="checkbox" v-model="card.mergeTopicsAndLessons" class="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50">
-                                        <span class="ml-2 text-xs font-medium text-gray-600 select-none">合并专题与课次列</span>
+                                        <span class="ml-2 text-xs font-medium text-gray-600 select-none">合并专题和课程列</span>
                                     </label>
                                 </div>
                              </div>
@@ -294,8 +294,14 @@
                                                     <input v-model="topic.topicName" class="w-full border-b border-gray-200 focus:border-blue-400 outline-none text-sm py-1">
                                                 </div>
                                                 <div v-if="!card.mergeTopicsAndLessons">
-                                                    <span class="text-gray-400 text-xs block mb-0.5">课程:</span>
-                                                    <input v-model="topic.courseName" placeholder="课程名称" class="w-full border-b border-gray-200 focus:border-blue-400 outline-none text-sm py-1">
+                                                    <span class="text-gray-400 text-xs block mb-1">课程:</span>
+                                                    <div class="flex flex-col gap-2">
+                                                        <div v-for="(course, courseIndex) in getTopicCourses(topic)" :key="courseIndex" class="group flex items-center bg-gray-50 rounded px-2 py-1 text-sm text-gray-600 border border-gray-200 focus-within:border-blue-400 focus-within:bg-white transition-colors w-full">
+                                                            <input v-model="getTopicCourses(topic)[courseIndex]" placeholder="课程名称" class="bg-transparent border-none outline-none flex-1 text-gray-700 p-0 m-0 focus:ring-0">
+                                                            <button @click="removeCourse(topic, courseIndex)" class="ml-2 text-red-400 hover:text-red-600 opacity-0 group-hover:opacity-100 focus:opacity-100 outline-none p-1">×</button>
+                                                        </div>
+                                                        <button @click="addCourse(topic)" class="w-full text-blue-500 text-xs hover:bg-blue-50 py-1.5 rounded border border-dashed border-blue-200">+ 添加课程</button>
+                                                    </div>
                                                 </div>
                                             </div>
                                             
@@ -489,17 +495,29 @@
         }
 
         function generateTableRows(card) {
+            const normalizeTopicCourses = (topic) => {
+                if (Array.isArray(topic.courseName)) return topic.courseName;
+                if (typeof topic.courseName === 'string') {
+                    return topic.courseName.trim() ? [topic.courseName] : [];
+                }
+                return [];
+            };
+
             let html = '';
-            
+
             // Calculate total rows for the card (for instructor rowspan)
             let totalCardRows = 0;
+            const isMerged = card.mergeTopicsAndLessons !== false; // Check flag
             if (card.modules) {
                 card.modules.forEach(mod => {
                     if (mod.topics) {
                         mod.topics.forEach(topic => {
-                            if (topic.lessons) {
-                                totalCardRows += topic.lessons.length;
-                            }
+                            const lessons = Array.isArray(topic.lessons) ? topic.lessons : [];
+                            const courses = normalizeTopicCourses(topic);
+                            const topicRows = isMerged
+                                ? lessons.length
+                                : Math.max(lessons.length, courses.length, 1);
+                            totalCardRows += topicRows;
                         });
                     }
                 });
@@ -507,21 +525,31 @@
 
             if (totalCardRows === 0) return '<tr><td colspan="5" class="text-gray-400 py-4">暂无课程数据</td></tr>';
 
-            const isMerged = card.mergeTopicsAndLessons !== false; // Check flag
             let isFirstRowOfCard = true;
 
             card.modules.forEach(mod => {
                 let totalModuleRows = 0;
                 mod.topics.forEach(topic => {
-                    totalModuleRows += topic.lessons.length;
+                    const lessons = Array.isArray(topic.lessons) ? topic.lessons : [];
+                    const courses = normalizeTopicCourses(topic);
+                    totalModuleRows += isMerged
+                        ? lessons.length
+                        : Math.max(lessons.length, courses.length, 1);
                 });
 
                 let isFirstRowOfModule = true;
 
                 mod.topics.forEach(topic => {
-                    const totalTopicRows = topic.lessons.length;
-                    
-                    topic.lessons.forEach((lesson, lessonIndex) => {
+                    const lessons = Array.isArray(topic.lessons) ? topic.lessons : [];
+                    const courses = normalizeTopicCourses(topic);
+                    const totalTopicRows = isMerged
+                        ? lessons.length
+                        : Math.max(lessons.length, courses.length, 1);
+                    const rowCount = Math.max(totalTopicRows, 1);
+
+                    for (let rowIndex = 0; rowIndex < rowCount; rowIndex++) {
+                        const lesson = lessons[rowIndex] || '';
+                        const course = courses[rowIndex] || '';
                         html += '<tr class="text-2xl">';
 
                         // Column 1: Module (with Grade below it)
@@ -537,26 +565,25 @@
                         if (isMerged) {
                             // --- Merged Mode (4 Columns total) ---
                             // Column 2: Topic (Rowspan)
-                            if (lessonIndex === 0) {
+                            if (rowIndex === 0) {
                                 let displayText = topic.topicName;
-                                if (topic.courseName && topic.courseName !== topic.topicName) {
-                                    displayText = `${topic.topicName} · ${topic.courseName}`;
+                                const courseText = courses.filter(Boolean).join(' · ');
+                                if (courseText && courseText !== topic.topicName) {
+                                    displayText = `${topic.topicName} · ${courseText}`;
                                 }
-                                html += `<td rowspan="${totalTopicRows}" class="text-gray-600 font-medium text-xl">${displayText}</td>`;
+                                html += `<td rowspan="${rowCount}" class="text-gray-600 font-medium text-xl">${displayText}</td>`;
                             }
                             // Column 3: Lesson
                             html += `<td class="text-left pl-4">${lesson}</td>`;
                         } else {
                             // --- Split Mode (5 Columns total) ---
                             // Column 2: Topic (Rowspan)
-                            if (lessonIndex === 0) {
-                                html += `<td rowspan="${totalTopicRows}" class="text-gray-600 font-medium text-xl">${topic.topicName}</td>`;
+                            if (rowIndex === 0) {
+                                html += `<td rowspan="${rowCount}" class="text-gray-600 font-medium text-xl">${topic.topicName}</td>`;
                             }
-                            // Column 3: Course (Rowspan)
-                            if (lessonIndex === 0) {
-                                html += `<td rowspan="${totalTopicRows}" class="text-gray-600 font-medium text-xl">${topic.courseName || ''}</td>`;
-                            }
-                            
+                            // Column 3: Course
+                            html += `<td class="text-gray-600 font-medium text-xl">${course}</td>`;
+
                             // Column 4: Lesson Content
                             html += `<td class="text-left pl-4">${lesson}</td>`;
                         }
@@ -568,7 +595,7 @@
                         }
 
                         html += '</tr>';
-                    });
+                    }
                 });
             });
 
@@ -1399,7 +1426,7 @@
                 const addTopic = (module) => {
                     module.topics.push({
                         topicName: "新专题",
-                        courseName: "", // Initialize courseName
+                        courseName: [],
                         lessons: ["新课次"]
                     });
                 };
@@ -1407,9 +1434,27 @@
                     module.topics.splice(tIndex, 1);
                 };
 
+                const getTopicCourses = (topic) => {
+                    if (Array.isArray(topic.courseName)) return topic.courseName;
+                    if (typeof topic.courseName === 'string') {
+                        topic.courseName = topic.courseName.trim() ? [topic.courseName] : [];
+                        return topic.courseName;
+                    }
+                    topic.courseName = [];
+                    return topic.courseName;
+                };
+
+                const addCourse = (topic) => {
+                    getTopicCourses(topic).push("");
+                };
+
+                const removeCourse = (topic, courseIndex) => {
+                    getTopicCourses(topic).splice(courseIndex, 1);
+                };
+
                 // Level 5: Lesson
                 const addLesson = (topic) => {
-                    // Previously this used a prompt(), which could block or cause issues. 
+                    // Previously this used a prompt(), which could block or cause issues.
                     // Since we have direct inline editing now, we just add an empty string.
                     topic.lessons.push("");
                 };
@@ -1425,20 +1470,47 @@
                     const flattenData = (level) => {
                         const rows = [];
                         const filtered = scheduleData.value.filter(s => (s.schoolLevel || 'junior') === level);
-                        
+
                         filtered.forEach(subject => {
                             if (!subject.cards || subject.cards.length === 0) return;
-                            
+
                             subject.cards.forEach(card => {
                                 if (!card.modules || card.modules.length === 0) return;
-                                
+
                                 card.modules.forEach(mod => {
                                     if (!mod.topics || mod.topics.length === 0) return;
-                                    
+
                                     mod.topics.forEach(topic => {
-                                        if (!topic.lessons || topic.lessons.length === 0) return;
-                                        
-                                        topic.lessons.forEach(lesson => {
+                                        const lessons = Array.isArray(topic.lessons) ? topic.lessons : [];
+                                        const courses = Array.isArray(topic.courseName)
+                                            ? topic.courseName
+                                            : (typeof topic.courseName === 'string' && topic.courseName.trim() ? [topic.courseName] : []);
+                                        const isMerged = card.mergeTopicsAndLessons !== false;
+
+                                        if (isMerged) {
+                                            if (lessons.length === 0) return;
+                                            const mergedCourseText = courses.filter(Boolean).join(' · ');
+                                            lessons.forEach(lesson => {
+                                                rows.push([
+                                                    level === 'senior' ? '高中' : '初中',
+                                                    subject.subjectName === '自定义' ? subject.customName : subject.subjectName,
+                                                    subject.newCount,
+                                                    subject.showNewBadge ? '是' : '否',
+                                                    (card.courseType || '') + '·' + (card.textbookVersion || ''),
+                                                    card.level,
+                                                    card.instructor,
+                                                    mod.moduleName,
+                                                    mod.gradeName || '',
+                                                    topic.topicName,
+                                                    mergedCourseText,
+                                                    lesson
+                                                ]);
+                                            });
+                                            return;
+                                        }
+
+                                        const rowCount = Math.max(lessons.length, courses.length, 1);
+                                        for (let i = 0; i < rowCount; i++) {
                                             rows.push([
                                                 level === 'senior' ? '高中' : '初中',
                                                 subject.subjectName === '自定义' ? subject.customName : subject.subjectName,
@@ -1450,10 +1522,10 @@
                                                 mod.moduleName,
                                                 mod.gradeName || '',
                                                 topic.topicName,
-                                                topic.courseName || '',
-                                                lesson
+                                                courses[i] || '',
+                                                lessons[i] || ''
                                             ]);
-                                        });
+                                        }
                                     });
                                 });
                             });
@@ -1531,6 +1603,7 @@
                     addCard, copyCard, removeCard,
                     addModule, removeModule,
                     addTopic, removeTopic,
+                    getTopicCourses, addCourse, removeCourse,
                     addLesson, removeLesson,
                     getSubjectNavColorClass, scrollToSubject
                 };
